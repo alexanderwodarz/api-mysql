@@ -262,7 +262,7 @@ public abstract class AbstractTable {
 
     private void setFieldValue(Field field, Object t, Object set) throws IllegalAccessException {
         if (field.getType() == String.class)
-            field.set(t, set.toString());
+            field.set(t, set == null ? "" : set.toString());
         if (field.getType() == int.class) {
             try {
                 field.set(t, set == null ? 0 : set);
