@@ -2,6 +2,9 @@ package de.alexanderwodarz.code.database;
 
 import de.alexanderwodarz.code.database.annotation.Column;
 import de.alexanderwodarz.code.database.annotation.Table;
+import de.alexanderwodarz.code.database.enums.ColumnDefault;
+import de.alexanderwodarz.code.database.enums.ColumnType;
+import de.alexanderwodarz.code.database.enums.DataType;
 import lombok.SneakyThrows;
 
 import java.lang.reflect.Field;
@@ -63,6 +66,7 @@ public abstract class AbstractTable {
         for (Field field : fields) {
             try {
                 if (field.get(table) instanceof Integer) {
+                    int i = field.getInt(table);
                     if (field.getInt(table) > 0) {
                         wheres += "`" + field.getName() + "`='" + field.get(table) + "' AND ";
                     }
@@ -230,10 +234,13 @@ public abstract class AbstractTable {
         Column col = field.getAnnotation(Column.class);
         String creation = "`" + getColumnNameFromField(field) + "`";
         if (database.getType().equals("mysql")) {
-            creation += " " + DataType.getByName(field.getType().getSimpleName()).getName() + (col.length() == 0 ? "" : "(" + col.length() + ")");
+            creation += " " + (col.type().getName().equals(ColumnType.empty.getName()) ? DataType.getByName(field.getType().getSimpleName()).getName() : col.type().getName()) + (col.length() == 0 ? "" : "(" + col.length() + ")");
+            if (col.defaultValue().getMethod().length() > 0 || col.defaultValue() == ColumnDefault.INTEGER)
+                creation += " default " + (col.defaultValue() == ColumnDefault.INTEGER ? col.defaultInt() : col.defaultValue().getMethod());
             creation += " " + (col.autoIncrement() ? "auto_increment" : "null");
             creation += ",";
         } else {
+            creation += " " + DataType.getByName(field.getType().getSimpleName()).getName() + (col.length() == 0 ? "" : "(" + col.length() + ")");
             creation += " " + DataType.getByName(field.getType().getSimpleName()).getName() + (col.length() == 0 ? "" : "(" + col.length() + ")");
             creation += (col.primaryKey() || col.autoIncrement() ? " constraint " + getName() + " primary key" + (col.autoIncrement() ? " autoincrement" : "") : "");
             creation += ",";
@@ -258,6 +265,72 @@ public abstract class AbstractTable {
         else
             name = ann.name();
         return name;
+    }
+
+    public <T> void update(T update, T old) {
+        String generated = generateUpdateQuery(update.getClass().getDeclaredFields(), old.getClass().getDeclaredFields(), old, update);
+        database.update(generated, null);
+    }
+
+    private <T> String generateUpdateQuery(Field[] newFields, Field[] whereFields, T t, T newT) {
+        if (!(t instanceof AbstractTable))
+            return "";
+        AbstractTable table = (AbstractTable) t;
+        AbstractTable newTable = (AbstractTable) newT;
+        String query = "UPDATE " + table.getName();
+        String set = "";
+        String wheres = "";
+        for (Field field : newFields) {
+            try {
+                if (field.get(newTable) instanceof Integer) {
+                    if (field.getInt(newTable) > 0) {
+                        set += "`" + field.getName() + "`='" + field.get(newTable) + "', ";
+                    }
+                }
+                if (field.get(newTable) instanceof String) {
+                    if (field.get(newTable).toString() != null) {
+                        Column column = field.getAnnotation(Column.class);
+                        set += "`" + (column.name().length() == 0 ? field.getName() : column.name()) + "`='" + field.get(newTable) + "', ";
+                    }
+                }
+                if (field.get(newTable) instanceof Long) {
+                    if (field.getLong(newTable) > 0) {
+                        set += "`" + field.getName() + "`='" + field.get(newTable) + "', ";
+                    }
+                }
+            } catch (IllegalAccessException e) {
+                e.printStackTrace();
+            }
+        }
+        for (Field field : whereFields) {
+            try {
+                if (field.get(table) instanceof Integer) {
+                    if (field.getInt(table) > 0) {
+                        wheres += "`" + field.getName() + "`='" + field.get(table) + "' AND ";
+                    }
+                }
+                if (field.get(table) instanceof String) {
+                    if (field.get(table).toString() != null) {
+                        Column column = field.getAnnotation(Column.class);
+                        wheres += "`" + (column.name().length() == 0 ? field.getName() : column.name()) + "`='" + field.get(table) + "' AND ";
+                    }
+                }
+                if (field.get(table) instanceof Long) {
+                    if (field.getLong(table) > 0) {
+                        wheres += "`" + field.getName() + "`='" + field.get(table) + "' AND ";
+                    }
+                }
+            } catch (IllegalAccessException e) {
+                e.printStackTrace();
+            }
+        }
+
+        if (set.length() > 0)
+            query += " SET " + set.substring(0, set.length() - 2);
+        if (wheres.length() > 0)
+            query += " WHERE " + wheres.substring(0, wheres.length() - 5);
+        System.out.println(query);
+        return query;
     }
 
     private void setFieldValue(Field field, Object t, Object set) throws IllegalAccessException {

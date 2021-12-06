@@ -1,4 +1,4 @@
-package de.alexanderwodarz.code.database;
+package de.alexanderwodarz.code.database.enums;
 
 public enum DataType {
 
