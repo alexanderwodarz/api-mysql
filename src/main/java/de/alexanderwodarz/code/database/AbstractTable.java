@@ -82,6 +82,9 @@ public abstract class AbstractTable {
                         wheres += "`" + field.getName() + "`='" + field.get(table) + "' AND ";
                     }
                 }
+                if (field.get(table) instanceof Boolean) {
+                    wheres += "`" + field.getName() + "`='" + (field.getBoolean(table) ? "1" : "0") + "' AND ";
+                }
             } catch (IllegalAccessException e) {
                 e.printStackTrace();
             }
