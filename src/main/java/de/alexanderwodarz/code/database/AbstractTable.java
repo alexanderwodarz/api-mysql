@@ -10,6 +10,7 @@ import lombok.SneakyThrows;
 import java.lang.reflect.Field;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.SQLWarning;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -95,10 +96,18 @@ public abstract class AbstractTable {
     }
 
     public void create() {
-        create(false);
+        create(null, false);
     }
 
     public void create(boolean verbose) {
+        create(null, verbose);
+    }
+
+    public void create(Runnable function) {
+        create(function, false);
+    }
+
+    public void create(Runnable function, boolean verbose) {
         String name = getName();
         String query = "CREATE TABLE IF NOT EXISTS " + name + " (";
         for (Field field : this.getClass().getFields()) {
@@ -130,7 +139,9 @@ public abstract class AbstractTable {
         query += ")";
         if (verbose)
             System.out.println(query);
-        database.update(query, null);
+        SQLWarning warning = database.update(query, null);
+        if (warning == null)
+            function.run();
     }
 
     public String getColumnForeignKey(Field field) {

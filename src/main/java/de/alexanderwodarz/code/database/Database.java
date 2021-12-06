@@ -92,7 +92,7 @@ public class Database {
         return table.getDeclaredConstructor(Database.class).newInstance(this);
     }
 
-    public void update(String query, List<Object> values) {
+    public SQLWarning update(String query, List<Object> values) {
         try {
             PreparedStatement stmt = connection.prepareStatement(query);
             int i = 1;
@@ -102,9 +102,11 @@ public class Database {
                     i++;
                 }
             stmt.executeUpdate();
+            return stmt.getWarnings();
         } catch (SQLException throwables) {
             throwables.printStackTrace();
         }
+        return null;
     }
 
 }
