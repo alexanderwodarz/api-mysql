@@ -141,7 +141,8 @@ public abstract class AbstractTable {
             System.out.println(query);
         SQLWarning warning = database.update(query, null);
         if (warning == null)
-            function.run();
+            if (function != null)
+                function.run();
     }
 
     public String getColumnForeignKey(Field field) {
@@ -226,7 +227,7 @@ public abstract class AbstractTable {
                     try {
                         if (field.get(this) == null)
                             continue;
-                        names += "`" + field.getName() + "`, ";
+                        names += "`" + (field.getAnnotation(Column.class).name().length() > 0 ? field.getAnnotation(Column.class).name() : field.getName()) + "`, ";
                         value += "?,";
                         values.add(field.get(this));
                     } catch (IllegalAccessException e) {
