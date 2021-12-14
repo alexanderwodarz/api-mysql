@@ -250,8 +250,8 @@ public abstract class AbstractTable {
         String creation = "`" + getColumnNameFromField(field) + "`";
         if (database.getType().equals("mysql")) {
             creation += " " + (col.type().getName().equals(ColumnType.empty.getName()) ? DataType.getByName(field.getType().getSimpleName()).getName() : col.type().getName()) + (col.length() == 0 ? "" : "(" + col.length() + ")");
-            if (col.defaultValue().getMethod().length() > 0 || col.defaultValue() == ColumnDefault.INTEGER)
-                creation += " default " + (col.defaultValue() == ColumnDefault.INTEGER ? col.defaultInt() : col.defaultValue().getMethod());
+            if (col.defaultValue().getMethod().length() > 0 || col.defaultValue() == ColumnDefault.INTEGER || col.defaultValue() == ColumnDefault.BOOLEAN)
+                creation += " default " + (col.defaultValue() == ColumnDefault.INTEGER ? col.defaultInt() : col.defaultValue() == ColumnDefault.BOOLEAN ? col.defaultBoolean() : col.defaultValue().getMethod());
             creation += " " + (col.autoIncrement() ? "auto_increment" : "null");
             creation += ",";
         } else {

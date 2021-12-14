@@ -27,6 +27,8 @@ public @interface Column {
 
     int defaultInt() default 0;
 
+    boolean defaultBoolean() default false;
+
     boolean autoIncrement() default false;
 
     boolean primaryKey() default false;

@@ -5,6 +5,7 @@ public enum ColumnDefault {
     CURRENT_TIMESTAMP("CURRENT_TIMESTAMP"),
     UNIX_TIMESTAMP("UNIX_TIMESTAMP()"),
     INTEGER(""),
+    BOOLEAN(""),
     RANDOM_STRING(""),
     empty("");
 
