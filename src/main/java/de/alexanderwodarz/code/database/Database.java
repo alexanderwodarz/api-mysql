@@ -67,7 +67,7 @@ public class Database {
                 return;
             System.out.println("Creating Connection to Database...");
 
-            Class.forName("com.mysql.cj.jdbc.Driver");
+            Class.forName("com.mysql.cj.jdbc.Driver").newInstance();
             DriverManager.setLoginTimeout(1);
             connection = DriverManager.getConnection(this.dburl, user, this.password);
             if (!connection.isClosed())
@@ -84,6 +84,8 @@ public class Database {
             }
         } catch (SQLException | ClassNotFoundException e) {
             throw new RuntimeException(e);
+        } catch (InstantiationException | IllegalAccessException e) {
+            e.printStackTrace();
         }
     }
 
