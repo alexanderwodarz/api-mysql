@@ -58,10 +58,6 @@ public class Database {
     }
 
     private void initDBConnection() {
-        initDBConnection(false);
-    }
-
-    private void initDBConnection(boolean notTryAgain) {
         try {
             if (connection != null)
                 return;
@@ -73,19 +69,31 @@ public class Database {
             if (!connection.isClosed())
                 System.out.println("...Connection established");
         } catch (SQLNonTransientConnectionException e) {
-            if (!notTryAgain) {
-                System.out.println("konnte nicht verbinden versuche datenbank zu erstellen");
-                try {
-                    Connection connection = DriverManager.getConnection("jdbc:mysql://" + host, user, this.password);
-                    connection.prepareStatement("CREATE DATABASE "+db).executeUpdate();
-                    initDBConnection(true);
-                } catch (Exception ignored) {
+            try {
+                String message = e.getCause().getMessage();
+                if (message.startsWith("Unknown database")) {
+                    System.out.println("datenbank existiert nicht, probiere sie zu erstellen");
+                    createDatabase();
+                    initDBConnection();
                 }
+                if (message.startsWith("Communications link failure")) {
+                    System.out.println("Connection to database failed");
+                    Thread.sleep(5000);
+                    initDBConnection();
+                }
+            } catch (Exception ex) {
+                ex.printStackTrace();
             }
-        } catch (SQLException | ClassNotFoundException e) {
-            throw new RuntimeException(e);
-        } catch (InstantiationException | IllegalAccessException e) {
+        } catch (Exception e) {
             e.printStackTrace();
+        }
+    }
+
+    private void createDatabase() {
+        try {
+            Connection connection = DriverManager.getConnection("jdbc:mysql://" + host, user, this.password);
+            connection.prepareStatement("CREATE DATABASE " + db).executeUpdate();
+        } catch (Exception ignored) {
         }
     }
 
@@ -94,9 +102,9 @@ public class Database {
         return table.getDeclaredConstructor(Database.class).newInstance(this);
     }
 
-    public SQLWarning update(String query, List<Object> values) {
+    public PreparedStatement update(String query, List<Object> values) {
         try {
-            PreparedStatement stmt = connection.prepareStatement(query);
+            PreparedStatement stmt = connection.prepareStatement(query, Statement.RETURN_GENERATED_KEYS);
             int i = 1;
             if (values != null)
                 for (Object value : values) {
@@ -104,7 +112,7 @@ public class Database {
                     i++;
                 }
             stmt.executeUpdate();
-            return stmt.getWarnings();
+            return stmt;
         } catch (SQLException throwables) {
             throwables.printStackTrace();
         }

@@ -8,6 +8,7 @@ import de.alexanderwodarz.code.database.enums.DataType;
 import lombok.SneakyThrows;
 
 import java.lang.reflect.Field;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.SQLWarning;
@@ -107,6 +108,7 @@ public abstract class AbstractTable {
         create(function, false);
     }
 
+    @SneakyThrows
     public void create(Runnable function, boolean verbose) {
         String name = getName();
         String query = "CREATE TABLE IF NOT EXISTS " + name + " (";
@@ -139,7 +141,7 @@ public abstract class AbstractTable {
         query += ")";
         if (verbose)
             System.out.println(query);
-        SQLWarning warning = database.update(query, null);
+        SQLWarning warning = database.update(query, null).getWarnings();
         if (warning == null)
             if (function != null)
                 function.run();
@@ -211,11 +213,12 @@ public abstract class AbstractTable {
         database.update(delete, new ArrayList<>());
     }
 
-    public void insert() {
-        insert(false);
+    public int insert() {
+        return insert(false);
     }
 
-    public void insert(boolean verbose) {
+    @SneakyThrows
+    public int insert(boolean verbose) {
         String name = getName();
         String insert = "INSERT INTO " + name + " ";
         String names = "";
@@ -240,7 +243,10 @@ public abstract class AbstractTable {
         insert += "(" + names + ") VALUES (" + value.substring(0, value.length() - 1) + ");";
         if (verbose)
             System.out.println(insert);
-        database.update(insert, values);
+        PreparedStatement result = database.update(insert, values);
+        ResultSet set = result.getGeneratedKeys();
+        set.next();
+        return set.getInt(1);
     }
 
     public String getFieldCreation(Field field) {
