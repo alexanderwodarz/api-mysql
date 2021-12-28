@@ -69,7 +69,6 @@ public abstract class AbstractTable {
             try {
                 Column column = field.getAnnotation(Column.class);
                 if (field.get(table) instanceof Integer) {
-                    int i = field.getInt(table);
                     if (field.getInt(table) > 0) {
                         wheres += "`" + (column.name().length() == 0 ? field.getName() : column.name()) + "`='" + field.get(table) + "' AND ";
                     }
@@ -85,6 +84,8 @@ public abstract class AbstractTable {
                     }
                 }
                 if (field.get(table) instanceof Boolean) {
+                    if (column.defaultValue() == ColumnDefault.BOOLEAN && column.defaultBoolean() == field.getBoolean(table))
+                        continue;
                     wheres += "`" + (column.name().length() == 0 ? field.getName() : column.name()) + "`='" + (field.getBoolean(table) ? "1" : "0") + "' AND ";
                 }
             } catch (IllegalAccessException e) {
