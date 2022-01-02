@@ -367,7 +367,10 @@ public abstract class AbstractTable {
         }
         if (field.getType() == boolean.class)
             field.set(t, Boolean.parseBoolean(set.toString()));
-        if (field.getType() == long.class)
+        if (field.getType() == long.class){
+            if(set == null)
+                set = 0;
             field.set(t, Long.parseLong(set.toString()));
+        }
     }
 }
