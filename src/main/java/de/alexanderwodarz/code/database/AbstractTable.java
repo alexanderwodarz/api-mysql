@@ -67,25 +67,26 @@ public abstract class AbstractTable {
         String wheres = "";
         for (Field field : fields) {
             try {
+                Column column = field.getAnnotation(Column.class);
                 if (field.get(table) instanceof Integer) {
-                    int i = field.getInt(table);
                     if (field.getInt(table) > 0) {
-                        wheres += "`" + field.getName() + "`='" + field.get(table) + "' AND ";
+                        wheres += "`" + (column.name().length() == 0 ? field.getName() : column.name()) + "`='" + field.get(table) + "' AND ";
                     }
                 }
                 if (field.get(table) instanceof String) {
                     if (field.get(table).toString() != null) {
-                        Column column = field.getAnnotation(Column.class);
                         wheres += "`" + (column.name().length() == 0 ? field.getName() : column.name()) + "`='" + field.get(table) + "' AND ";
                     }
                 }
                 if (field.get(table) instanceof Long) {
                     if (field.getLong(table) > 0) {
-                        wheres += "`" + field.getName() + "`='" + field.get(table) + "' AND ";
+                        wheres += "`" + (column.name().length() == 0 ? field.getName() : column.name()) + "`='" + field.get(table) + "' AND ";
                     }
                 }
                 if (field.get(table) instanceof Boolean) {
-                    wheres += "`" + field.getName() + "`='" + (field.getBoolean(table) ? "1" : "0") + "' AND ";
+                    if (column.defaultValue() == ColumnDefault.BOOLEAN && column.defaultBoolean() == field.getBoolean(table))
+                        continue;
+                    wheres += "`" + (column.name().length() == 0 ? field.getName() : column.name()) + "`='" + (field.getBoolean(table) ? "1" : "0") + "' AND ";
                 }
             } catch (IllegalAccessException e) {
                 e.printStackTrace();
@@ -366,7 +367,10 @@ public abstract class AbstractTable {
         }
         if (field.getType() == boolean.class)
             field.set(t, Boolean.parseBoolean(set.toString()));
-        if (field.getType() == long.class)
-            field.set(t, Long.parseLong(set == null ? (0+"") : set.toString()));
+        if (field.getType() == long.class){
+            if(set == null)
+                set = 0;
+            field.set(t, Long.parseLong(set.toString()));
+        }
     }
 }
