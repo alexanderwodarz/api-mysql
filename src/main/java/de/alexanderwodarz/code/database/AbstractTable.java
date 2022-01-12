@@ -5,6 +5,7 @@ import de.alexanderwodarz.code.database.annotation.Table;
 import de.alexanderwodarz.code.database.enums.ColumnDefault;
 import de.alexanderwodarz.code.database.enums.ColumnType;
 import de.alexanderwodarz.code.database.enums.DataType;
+import de.alexanderwodarz.code.database.enums.RowSort;
 import lombok.SneakyThrows;
 
 import java.lang.reflect.Field;
@@ -28,9 +29,9 @@ public abstract class AbstractTable {
     }
 
     @SneakyThrows
-    public <T> List<T> getAll(T filter, boolean verbose) {
+    public <T> List<T> getAll(T filter, String sortColumn, RowSort sort, int limit, boolean verbose) {
         List<T> list = new ArrayList<>();
-        String query = generateQuery(filter.getClass().getFields(), filter);
+        String query = generateQuery(filter.getClass().getFields(), limit, sortColumn, sort, filter);
         if (verbose)
             System.out.println(query);
         try {
@@ -55,11 +56,21 @@ public abstract class AbstractTable {
     }
 
     @SneakyThrows
-    public <T> List<T> getAll(T filter) {
-        return getAll(filter, false);
+    public <T> List<T> getAll(T filter, String sortColumn, RowSort sort, boolean verbose) {
+        return getAll(filter, sortColumn, sort, 0, verbose);
     }
 
-    private <T> String generateQuery(Field[] fields, T t) {
+    @SneakyThrows
+    public <T> List<T> getAll(T filter, int limit) {
+        return getAll(filter, null, null, limit, false);
+    }
+
+    @SneakyThrows
+    public <T> List<T> getAll(T filter) {
+        return getAll(filter, 0);
+    }
+
+    private <T> String generateQuery(Field[] fields, int limit, String sortType, RowSort sort, T t) {
         if (!(t instanceof AbstractTable))
             return "";
         AbstractTable table = (AbstractTable) t;
@@ -94,6 +105,10 @@ public abstract class AbstractTable {
         }
         if (wheres.length() > 0)
             query += " WHERE " + wheres.substring(0, wheres.length() - 5);
+        if (sort != null)
+            query += " ORDER BY " + sortType + " " + sort;
+        if (limit > 0)
+            query += " LIMIT " + limit;
         return query;
     }
 
@@ -173,17 +188,21 @@ public abstract class AbstractTable {
         return false;
     }
 
-    public <T> T getOne(T t) {
+    public <T> T getOne(T t, int limit) {
         try {
-            return getAll(t).get(0);
+            return getAll(t, limit).get(0);
         } catch (Exception e) {
             return null;
         }
     }
 
-    public <T> T getOne(T t, boolean verbose) {
+    public <T> T getOne(T t) {
+        return getOne(t, 0);
+    }
+
+    public <T> T getOne(T t, int limit, boolean verbose) {
         try {
-            return getAll(t, verbose).get(0);
+            return getAll(t, null, null, limit, verbose).get(0);
         } catch (Exception e) {
             return null;
         }
@@ -367,8 +386,8 @@ public abstract class AbstractTable {
         }
         if (field.getType() == boolean.class)
             field.set(t, Boolean.parseBoolean(set.toString()));
-        if (field.getType() == long.class){
-            if(set == null)
+        if (field.getType() == long.class) {
+            if (set == null)
                 set = 0;
             field.set(t, Long.parseLong(set.toString()));
         }
