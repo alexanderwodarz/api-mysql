@@ -11,9 +11,15 @@ public class Database {
 
     private String user, password, db, host, dburl, path, type, connectionString = "?useUnicode=true&autoReconnect=true&characterEncoding=utf-8&useJDBCCompliantTimezoneShift=true&useLegacyDatetimeCode=false&serverTimezone=UTC";
     private Connection connection;
+    private boolean verbose;
+
+
+    public Database(String host, String username, String password, String db) {
+        this(host, username, password, db, false);
+    }
 
     @SneakyThrows
-    public Database(String host, String username, String password, String db) {
+    public Database(String host, String username, String password, String db, boolean verbose) {
         this.type = "mysql";
         this.user = username;
         this.password = password;
@@ -21,7 +27,12 @@ public class Database {
         this.host = host;
         this.dburl = "jdbc:mysql://" + host + "/" + db
                 + connectionString;
+        this.verbose = verbose;
         initDBConnection();
+    }
+
+    public boolean isVerbose() {
+        return verbose;
     }
 
     @SneakyThrows
