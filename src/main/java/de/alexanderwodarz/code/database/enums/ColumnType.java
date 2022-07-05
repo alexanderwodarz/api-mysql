@@ -3,6 +3,8 @@ package de.alexanderwodarz.code.database.enums;
 public enum ColumnType {
 
     TIMESTAMP("timestamp"),
+    MEDIUMTEXT("mediumtext"),
+    JSON("json"),
     empty("empty");
 
     private String name;
