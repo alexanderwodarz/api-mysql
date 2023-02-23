@@ -2,7 +2,9 @@ package de.alexanderwodarz.code.database.query;
 
 import de.alexanderwodarz.code.database.AbstractTable;
 import de.alexanderwodarz.code.database.Database;
+import de.alexanderwodarz.code.database.Selector;
 import de.alexanderwodarz.code.database.annotation.Column;
+import de.alexanderwodarz.code.database.enums.QueryOperator;
 import lombok.RequiredArgsConstructor;
 
 import java.lang.reflect.Field;
@@ -13,22 +15,28 @@ import java.util.ArrayList;
 import java.util.List;
 
 @RequiredArgsConstructor
-public class QuerySelector<T extends AbstractTable> {
+public class QuerySelector<T extends AbstractTable> extends Selector<T> {
 
     private final T t;
     private final boolean verbose;
-    private List<QueryParameter> parameters = new ArrayList<>();
+    public Parameter addParameter() {
+        return new Parameter(this);
+    }
 
-    private int limit;
-
-    public QuerySelector addParameter(QueryParameter parameter) {
-        this.parameters.add(parameter);
+    public QuerySelector<T> addParameter(Parameter parameter) {
+        parameters.add(parameter);
         return this;
     }
 
-    public QueryParameter addParameter() {
-        return new QueryParameter(this);
+    public QuerySelector<T> addParameter(String key, Object value, QueryOperator operator) {
+        return (QuerySelector<T>) new Parameter(this).setKey(key).setValue(value).setOperator(operator).build();
     }
+
+    public QuerySelector<T> addParameter(String key, Object value) {
+        return addParameter(key, value, QueryOperator.EQUALS);
+    }
+
+    private int limit;
 
     public List<T> executeMany() {
         List<T> list = new ArrayList<>();
@@ -39,24 +47,29 @@ public class QuerySelector<T extends AbstractTable> {
             ResultSet rs = t.getDatabase().query(query);
             if (rs.next()) {
                 while (!rs.isAfterLast()) {
-                    T entry = (T) t.getClass().getConstructor(Database.class).newInstance(t.getDatabase());
-                    for (Field field : entry.getClass().getFields()) {
-                        if (!field.isAnnotationPresent(Column.class))
-                            continue;
-                        Column column = field.getAnnotation(Column.class);
-                        setFieldValue(field, entry, rs.getObject(column.name().length() == 0 ? field.getName() : column.name()));
-                    }
-                    list.add(entry);
+                    list.add(setVariables(rs));
                     rs.next();
                 }
             }
         } catch (SQLException e) {
             e.printStackTrace();
-        } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException |
-                 InstantiationException e) {
-            throw new RuntimeException(e);
         }
         return list;
+    }
+
+    public T setVariables(ResultSet rs) {
+        try {
+            T entry = (T) t.getClass().getConstructor(Database.class).newInstance(t.getDatabase());
+            for (Field field : entry.getClass().getFields()) {
+                if (!field.isAnnotationPresent(Column.class))
+                    continue;
+                Column column = field.getAnnotation(Column.class);
+                setFieldValue(field, entry, rs.getObject(column.name().length() == 0 ? field.getName() : column.name()));
+            }
+            return entry;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     public T executeOne() {
@@ -67,11 +80,11 @@ public class QuerySelector<T extends AbstractTable> {
     public String buildQuery() {
         String query = "SELECT * FROM " + t.getName();
 
-        if (parameters.size() > 0)
+        if (getParameters().size() > 0)
             query += " WHERE";
-        for (QueryParameter parameter : parameters)
+        for (Object parameter : getParameters())
             query += " " + parameter + " AND";
-        if (parameters.size() > 0)
+        if (getParameters().size() > 0)
             query = query.substring(0, query.length() - 4);
         if (limit > 0)
             query += " LIMIT " + limit;
@@ -85,6 +98,18 @@ public class QuerySelector<T extends AbstractTable> {
     public QuerySelector setLimit(int limit) {
         this.limit = limit;
         return this;
+    }
+
+    public int getRowCount() {
+        try {
+            ResultSet rs = t.getDatabase().query("SELECT COUNT(*) FROM " + t.getName() + ";");
+            if (rs.next()) {
+                return rs.getInt("COUNT(*)");
+            }
+        } catch (SQLException e) {
+
+        }
+        return 0;
     }
 
 

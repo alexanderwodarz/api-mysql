@@ -9,7 +9,14 @@ import java.util.List;
 @Getter
 public class Database {
 
-    private String user, password, db, host, dburl, path, type, connectionString = "?useUnicode=true&autoReconnect=true&characterEncoding=utf-8&useJDBCCompliantTimezoneShift=true&useLegacyDatetimeCode=false&serverTimezone=UTC";
+    private String user;
+    private String password;
+    private String db;
+    private String host;
+    private String dburl;
+    private String path;
+    private String type;
+    private final String connectionString = "?useUnicode=true&autoReconnect=true&characterEncoding=utf-8&useJDBCCompliantTimezoneShift=true&useLegacyDatetimeCode=false&serverTimezone=UTC";
     private Connection connection;
     private boolean verbose;
 
@@ -63,7 +70,7 @@ public class Database {
     public ResultSet query(String query) {
         try {
             return connection.createStatement().executeQuery(query);
-        } catch (SQLException throwables) {
+        } catch (SQLException ignored) {
         }
         return null;
     }
@@ -109,7 +116,7 @@ public class Database {
     }
 
     @SneakyThrows
-    public <abstractTable> abstractTable getTable(Class<abstractTable> table) {
+    public <T> T getTable(Class<T> table) {
         return table.getDeclaredConstructor(Database.class).newInstance(this);
     }
 

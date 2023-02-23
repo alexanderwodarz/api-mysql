@@ -6,7 +6,9 @@ import de.alexanderwodarz.code.database.enums.ColumnDefault;
 import de.alexanderwodarz.code.database.enums.ColumnType;
 import de.alexanderwodarz.code.database.enums.DataType;
 import de.alexanderwodarz.code.database.enums.RowSort;
+import de.alexanderwodarz.code.database.pagination.Pagination;
 import de.alexanderwodarz.code.database.query.QuerySelector;
+import de.alexanderwodarz.code.database.update.UpdateSelector;
 import lombok.SneakyThrows;
 
 import java.lang.reflect.Field;
@@ -17,12 +19,27 @@ import java.sql.SQLWarning;
 import java.util.ArrayList;
 import java.util.List;
 
-public abstract class AbstractTable {
+public abstract class AbstractTable<T extends AbstractTable> {
 
     private Database database;
 
     public AbstractTable(Database database) {
         this.database = database;
+    }
+
+    public T setValues(ResultSet rs) {
+        try {
+            T entry = (T) this.getClass().getConstructor(Database.class).newInstance(getDatabase());
+            for (Field field : entry.getClass().getFields()) {
+                if (!field.isAnnotationPresent(Column.class))
+                    continue;
+                Column column = field.getAnnotation(Column.class);
+                setFieldValue(field, entry, rs.getObject(column.name().length() == 0 ? field.getName() : column.name()));
+            }
+            return entry;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     public Database getDatabase() {
@@ -34,7 +51,7 @@ public abstract class AbstractTable {
     }
 
     @SneakyThrows
-    public <T> List<T> getAll(T filter, String sortColumn, RowSort sort, int limit, boolean verbose) {
+    public List<T> getAll(T filter, String sortColumn, RowSort sort, int limit, boolean verbose) {
         List<T> list = new ArrayList<>();
         String query = generateQuery(filter.getClass().getFields(), limit, sortColumn, sort, filter);
         if (verbose)
@@ -60,16 +77,16 @@ public abstract class AbstractTable {
         return list;
     }
 
-    public QuerySelector query(boolean verbose) {
-        return new QuerySelector(this, verbose);
+    public QuerySelector<T> query(boolean verbose) {
+        return new QuerySelector<>((T) this, verbose);
     }
 
-    public QuerySelector query() {
+    public QuerySelector<T> query() {
         return query(database.isVerbose());
     }
 
 
-    private <T> String generateQuery(Field[] fields, int limit, String sortType, RowSort sort, T t) {
+    private String generateQuery(Field[] fields, int limit, String sortType, RowSort sort, T t) {
         if (!(t instanceof AbstractTable))
             return "";
         AbstractTable table = (AbstractTable) t;
@@ -126,22 +143,22 @@ public abstract class AbstractTable {
     @SneakyThrows
     public void create(Runnable function, boolean verbose) {
         String name = getName();
-        String query = "CREATE TABLE IF NOT EXISTS " + name + " (";
+        StringBuilder query = new StringBuilder("CREATE TABLE IF NOT EXISTS " + name + " (");
         for (Field field : this.getClass().getFields()) {
-            query += getFieldCreation(field);
+            query.append(getFieldCreation(field));
         }
-        query = query.substring(0, query.length() - 1);
+        query = new StringBuilder(query.substring(0, query.length() - 1));
         if (database.getType().equals("mysql")) {
             if (hasPrimaryKey()) {
-                query += ", primary key (";
+                query.append(", primary key (");
                 for (Field field : this.getClass().getFields()) {
                     if (!field.isAnnotationPresent(Column.class))
                         continue;
                     if (!field.getAnnotation(Column.class).primaryKey())
                         continue;
-                    query += getColumnNameFromField(field) + ",";
+                    query.append(getColumnNameFromField(field)).append(",");
                 }
-                query = query.substring(0, query.length() - 1) + ")";
+                query = new StringBuilder(query.substring(0, query.length() - 1) + ")");
             }
         }
         if (hasForeignKey()) {
@@ -150,16 +167,16 @@ public abstract class AbstractTable {
                     continue;
                 if (field.getAnnotation(Column.class).foreignKey().length() == 0)
                     continue;
-                query += getColumnForeignKey(field);
+                query.append(getColumnForeignKey(field));
             }
         }
-        query += ")";
+        query.append(")");
         if (verbose)
             System.out.println(query);
         boolean added = false;
         if (database.getType().equals("sqlite"))
             added = !(database.query("SELECT * FROM sqlite_master WHERE type='table' AND tbl_name='" + getName() + "'").next());
-        SQLWarning warning = database.update(query, null).getWarnings();
+        SQLWarning warning = database.update(query.toString(), null).getWarnings();
         if ((database.getType().equals("mysql") && warning == null) || added)
             if (function != null)
                 function.run();
@@ -243,12 +260,20 @@ public abstract class AbstractTable {
         }
         names = names.substring(0, names.length() - 2);
         insert += "(" + names + ") VALUES (" + value.substring(0, value.length() - 1) + ");";
-        if (verbose)
+        if (verbose){
             System.out.println(insert);
+            for (Object o : values) {
+                System.out.println(o);
+            }
+        }
         PreparedStatement result = database.update(insert, values);
         ResultSet set = result.getGeneratedKeys();
         set.next();
-        return set.getInt(1);
+        try{
+            return set.getInt(1);
+        }catch (Exception e){
+            return 0;
+        }
     }
 
     public String getFieldCreation(Field field) {
@@ -260,7 +285,7 @@ public abstract class AbstractTable {
             creation += " " + (col.type().getName().equals(ColumnType.empty.getName()) ? DataType.getByName(field.getType().getSimpleName()).getName() : col.type().getName()) + (col.length() == 0 ? "" : "(" + col.length() + ")");
             if (col.defaultValue().getMethod().length() > 0 || col.defaultValue() == ColumnDefault.INTEGER || col.defaultValue() == ColumnDefault.BOOLEAN)
                 creation += " default " + (col.defaultValue() == ColumnDefault.INTEGER ? col.defaultInt() : col.defaultValue() == ColumnDefault.BOOLEAN ? col.defaultBoolean() : col.defaultValue().getMethod());
-            creation += " " + (col.autoIncrement() ? "auto_increment" : "null");
+            creation += " " + (col.autoIncrement() ? "auto_increment" : (col.primaryKey() ? "not " : "") + "null");
             creation += ",";
         } else {
             creation += " " + DataType.getByName(field.getType().getSimpleName()).getName() + (col.length() == 0 ? "" : "(" + col.length() + ")");
@@ -289,12 +314,28 @@ public abstract class AbstractTable {
         return "`" + name + "`";
     }
 
-    public <T> void update(T update, T old) {
+    public UpdateSelector<AbstractTable> update() {
+        return new UpdateSelector<>(this);
+    }
+
+    public void update(T update, T old) {
         String generated = generateUpdateQuery(update.getClass().getDeclaredFields(), old.getClass().getDeclaredFields(), old, update);
         database.update(generated, null);
     }
 
-    private <T> String generateUpdateQuery(Field[] newFields, Field[] whereFields, T t, T newT) {
+    public Pagination<T> getPagination() {
+        return getPagination(10, query());
+    }
+
+    public Pagination<T> getPagination(QuerySelector query) {
+        return getPagination(10, query);
+    }
+
+    public Pagination<T> getPagination(int limit, QuerySelector query) {
+        return new Pagination<>((T) this, limit, query);
+    }
+
+    private String generateUpdateQuery(Field[] newFields, Field[] whereFields, T t, T newT) {
         if (!(t instanceof AbstractTable))
             return "";
         AbstractTable table = (AbstractTable) t;

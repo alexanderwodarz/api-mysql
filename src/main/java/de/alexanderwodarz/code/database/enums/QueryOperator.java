@@ -3,6 +3,7 @@ package de.alexanderwodarz.code.database.enums;
 public enum QueryOperator {
 
     EQUALS("="),
+    NOT_EQUALS("!="),
     LOWER("<"),
     HIGHER(">");
 
